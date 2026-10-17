@@ -3,6 +3,7 @@ package nl.jd.display;
 import nl.jd.classes.SimulationPanel;
 
 import javax.swing.*;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.concurrent.TimeUnit;
@@ -11,9 +12,12 @@ public class Draw {
     SimulationPanel simulationPanel;
     JFrame frame;
 
+    static int pixelSize;
+
     public Draw (SimulationPanel simulationPanel, JFrame frame) {
         this.simulationPanel = simulationPanel;
         this.frame = frame;
+        pixelSize = 1;
     }
 
     public void drawLine() throws InterruptedException {
@@ -39,11 +43,23 @@ public class Draw {
     private void draw(MouseEvent e) {
         int x = e.getX() * simulationPanel.getSimWidth()  / simulationPanel.getWidth();
         int y = e.getY() * simulationPanel.getSimHeight() / simulationPanel.getHeight();
-        simulationPanel.setPixel(x, y, 0xFFFFFF);
+        int color = e.getModifiersEx() == InputEvent.BUTTON1_DOWN_MASK ? 0xFFFFFF :  0x00000000;
+
+        drawDot(x, y, color);
         simulationPanel.repaint();
     }
 
     private void repaint() {
         frame.repaint();
+    }
+
+    private void drawDot(int x, int y, int rgb) {
+        var radius = pixelSize / 2;
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                if (dx * dx + dy * dy > radius * radius)  continue;
+                simulationPanel.setPixel(x + dx, y + dy, rgb);
+            }
+        }
     }
 }
