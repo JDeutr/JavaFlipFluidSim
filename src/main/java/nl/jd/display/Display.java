@@ -1,5 +1,6 @@
 package nl.jd.display;
 
+import nl.jd.classes.Gameloop;
 import nl.jd.classes.SimulationPanel;
 
 import javax.swing.*;
@@ -31,7 +32,7 @@ public class Display {
         Draw draw = new Draw(panel, frame);
         draw.drawCursor();
 
+//        Gameloop gameloop = new Gameloop();
 
-//        draw.drawLine();
     }
 }
