@@ -1,30 +1,39 @@
 package nl.jd.display;
 
+import nl.jd.classes.Particles;
 import nl.jd.classes.SimulationPanel;
 
 import javax.swing.*;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.concurrent.TimeUnit;
 
 public class Draw {
-    SimulationPanel simulationPanel;
-    JFrame frame;
+    private final SimulationPanel simulationPanel;
+    private final Particles particles;
 
-    static int pixelSize;
+    static volatile int pixelSize = 2;
 
-    public Draw (SimulationPanel simulationPanel, JFrame frame) {
+    public Draw(SimulationPanel simulationPanel, Particles particles) {
         this.simulationPanel = simulationPanel;
-        this.frame = frame;
-        pixelSize = 1;
+        this.particles = particles;
     }
 
-    public void drawLine() throws InterruptedException {
-        for (int i = 0; i < 2000; i++) {
-            simulationPanel.setPixel(i,i, 0xFF0000);
-            repaint();
-            TimeUnit.MILLISECONDS.sleep(50);
+    // The render callback: called from the render thread, returns immediately
+    public void redraw() {
+        SwingUtilities.invokeLater(() -> {
+            simulationPanel.clear(0x000000);
+            drawParticles();
+            simulationPanel.repaint();
+        });
+    }
+
+    private void drawParticles() {
+        float[][] s = particles.getSnapshot();
+        if (s == null) return;
+        float[] xs = s[0], ys = s[1];
+        for (int i = 0; i < xs.length; i++) {
+            drawDot((int) xs[i], (int) ys[i], 0x4488FF);
         }
     }
 
@@ -43,21 +52,21 @@ public class Draw {
     private void draw(MouseEvent e) {
         int x = e.getX() * simulationPanel.getSimWidth()  / simulationPanel.getWidth();
         int y = e.getY() * simulationPanel.getSimHeight() / simulationPanel.getHeight();
-        int color = e.getModifiersEx() == InputEvent.BUTTON1_DOWN_MASK ? 0xFFFFFF :  0x00000000;
+        int color = (e.getModifiersEx() & InputEvent.BUTTON1_DOWN_MASK) != 0 ? 0xFFFFFF : 0x000000;
 
         drawDot(x, y, color);
         simulationPanel.repaint();
     }
 
-    private void repaint() {
-        frame.repaint();
-    }
-
     private void drawDot(int x, int y, int rgb) {
-        var radius = pixelSize / 2;
+        int radius = pixelSize / 2;
+        if (radius == 0) {
+            simulationPanel.setPixel(x, y, rgb);
+            return;
+        }
         for (int dy = -radius; dy <= radius; dy++) {
             for (int dx = -radius; dx <= radius; dx++) {
-                if (dx * dx + dy * dy > radius * radius)  continue;
+                if (dx * dx + dy * dy > radius * radius) continue;
                 simulationPanel.setPixel(x + dx, y + dy, rgb);
             }
         }

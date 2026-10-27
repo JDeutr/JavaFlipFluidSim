@@ -31,6 +31,8 @@ public class SimulationPanel extends JPanel {
         pixels[y * width + x] = rgb;
     }
 
+    public void clear(int rgb) { java.util.Arrays.fill(pixels, rgb); }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
