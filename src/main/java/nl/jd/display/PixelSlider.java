@@ -14,7 +14,7 @@ public class PixelSlider extends JSlider implements ChangeListener {
     }
 
     public void stateChanged(ChangeEvent e) {
-        JSlider source = (JSlider)e.getSource();
+        JSlider source = (JSlider) e.getSource();
         Draw.pixelSize = source.getValue();
     }
 }

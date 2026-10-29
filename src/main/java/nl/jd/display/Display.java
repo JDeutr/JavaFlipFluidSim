@@ -7,14 +7,14 @@ import nl.jd.classes.SimulationPanel;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionListener;
-import java.util.Random;
 
 public class Display {
     private static final int TARGET_FPS = 144;
-    private static final int PARTICLE_CAPACITY = 10_000;
+    private static final int PARTICLE_COUNT = 25_000;
+    public static Dimension screen;
 
     public static void main(String[] args) {
-        Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
+        screen = Toolkit.getDefaultToolkit().getScreenSize();
 
         JFrame frame = createFrame(screen);
         SimulationPanel panel = new SimulationPanel(screen.width / 4, screen.height / 4);
@@ -40,13 +40,16 @@ public class Display {
     }
 
     private static Particles createParticles(int w, int h) {
-        Particles particles = new Particles(PARTICLE_CAPACITY);
-        Random rng = new Random(69);
-        for (int row = 0; row < 60; row++) {
-            for (int col = 0; col < 100; col++) {
-                particles.add(w / 4f + col * 2f + rng.nextFloat(),
-                        h / 4f + row * 2f + rng.nextFloat());
-            }
+        float spacing = (float) Draw.pixelSize / 2;
+        int cols = (int) (w / spacing);
+        float startY = h * 0.15f;
+
+        Particles particles = new Particles(PARTICLE_COUNT);
+        for (int i = 0; i < PARTICLE_COUNT; i++) {
+            int currCol = i % cols;
+            int currRow = i / cols;
+            particles.add(currCol * spacing,
+                    startY + currRow * spacing);
         }
         return particles;
     }

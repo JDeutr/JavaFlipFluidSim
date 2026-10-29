@@ -9,10 +9,9 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 public class Draw {
+    static volatile int pixelSize = 2;
     private final SimulationPanel simulationPanel;
     private final Particles particles;
-
-    static volatile int pixelSize = 2;
 
     public Draw(SimulationPanel simulationPanel, Particles particles) {
         this.simulationPanel = simulationPanel;
@@ -40,17 +39,21 @@ public class Draw {
     public void drawCursor() {
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override
-            public void mousePressed(MouseEvent e) { draw(e); }
+            public void mousePressed(MouseEvent e) {
+                draw(e);
+            }
 
             @Override
-            public void mouseDragged(MouseEvent e) { draw(e); }
+            public void mouseDragged(MouseEvent e) {
+                draw(e);
+            }
         };
         simulationPanel.addMouseListener(mouseAdapter);
         simulationPanel.addMouseMotionListener(mouseAdapter);
     }
 
     private void draw(MouseEvent e) {
-        int x = e.getX() * simulationPanel.getSimWidth()  / simulationPanel.getWidth();
+        int x = e.getX() * simulationPanel.getSimWidth() / simulationPanel.getWidth();
         int y = e.getY() * simulationPanel.getSimHeight() / simulationPanel.getHeight();
         int color = (e.getModifiersEx() & InputEvent.BUTTON1_DOWN_MASK) != 0 ? 0xFFFFFF : 0x000000;
 

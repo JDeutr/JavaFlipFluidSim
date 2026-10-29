@@ -3,10 +3,9 @@ package nl.jd.classes;
 import java.util.Arrays;
 
 public class Particles {
+    static final float GRAVITY = 200f;
     public final float[] x, y, vx, vy;
     public int count = 0;
-
-    // Physics thread writes this, the EDT reads it
     private volatile float[][] snapshot;
 
     public Particles(int capacity) {
@@ -40,25 +39,35 @@ public class Particles {
     }
 
     public void publish() {
-        snapshot = new float[][] { Arrays.copyOf(x, count), Arrays.copyOf(y, count) };
+        snapshot = new float[][]{Arrays.copyOf(x, count), Arrays.copyOf(y, count)};
     }
 
     public float[][] getSnapshot() {
         return snapshot;
     }
 
-    static final float GRAVITY = 200f;
-
     public void step(float dt, int width, int height) {
         for (int i = 0; i < count; i++) {
             vy[i] += GRAVITY * dt;
-            x[i]  += vx[i] * dt;
-            y[i]  += vy[i] * dt;
+            x[i] += vx[i] * dt;
+            y[i] += vy[i] * dt;
 
-            if (x[i] < 0)           { x[i] = 0;          vx[i] = 0; }
-            if (x[i] > width - 1)   { x[i] = width - 1;  vx[i] = 0; }
-            if (y[i] < 0)           { y[i] = 0;          vy[i] = 0; }
-            if (y[i] > height - 1)  { y[i] = height - 1; vy[i] = 0; }
+            if (x[i] < 0) {
+                x[i] = 0;
+                vx[i] = 0;
+            }
+            if (x[i] > width - 1) {
+                x[i] = width - 1;
+                vx[i] = 0;
+            }
+            if (y[i] < 0) {
+                y[i] = 0;
+                vy[i] = 0;
+            }
+            if (y[i] > height - 1) {
+                y[i] = height - 1;
+                vy[i] = 0;
+            }
         }
         publish();
     }

@@ -24,7 +24,9 @@ public class SimulationLoop {
         new Thread(this::renderLoop, "render").start();
     }
 
-    public void stop() { running = false; }
+    public void stop() {
+        running = false;
+    }
 
     private void physicsLoop() {
         final long maxFrameNanos = 250_000_000L;
@@ -39,8 +41,11 @@ public class SimulationLoop {
             previous = now;
 
             while (accumulator >= TIME_STEP) {
-                try { update.run(); }
-                catch (RuntimeException e) { e.printStackTrace(); }
+                try {
+                    update.run();
+                } catch (RuntimeException e) {
+                    e.printStackTrace();
+                }
                 accumulator -= TIME_STEP;
                 steps++;
             }
@@ -74,6 +79,11 @@ public class SimulationLoop {
         }
     }
 
-    public int getFramesPerSecond() { return measuredFps; }
-    public int getStepsPerSecond()  { return measuredSteps; }
+    public int getFramesPerSecond() {
+        return measuredFps;
+    }
+
+    public int getStepsPerSecond() {
+        return measuredSteps;
+    }
 }
