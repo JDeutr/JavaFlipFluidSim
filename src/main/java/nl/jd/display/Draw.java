@@ -1,5 +1,6 @@
 package nl.jd.display;
 
+import nl.jd.classes.Grid;
 import nl.jd.classes.Particles;
 import nl.jd.classes.SimulationPanel;
 
@@ -12,10 +13,12 @@ public class Draw {
     static volatile int pixelSize = 2;
     private final SimulationPanel simulationPanel;
     private final Particles particles;
+    private Grid grid;
 
-    public Draw(SimulationPanel simulationPanel, Particles particles) {
+    public Draw(SimulationPanel simulationPanel, Particles particles, Grid grid) {
         this.simulationPanel = simulationPanel;
         this.particles = particles;
+        this.grid = grid;
     }
 
     // The render callback: called from the render thread, returns immediately
@@ -33,6 +36,10 @@ public class Draw {
         float[] xs = s[0], ys = s[1];
         for (int i = 0; i < xs.length; i++) {
             drawDot((int) xs[i], (int) ys[i], 0x4488FF);
+        }
+
+        if (grid != null && simulationPanel.isShowGrid()) {
+            simulationPanel.drawGrid(grid, 0xFF0000);
         }
     }
 

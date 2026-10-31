@@ -22,10 +22,11 @@ public class Display {
         frame.add(panel, BorderLayout.CENTER);
 
         Particles particles = createParticles(panel.getSimWidth(), panel.getSimHeight());
-        Draw draw = new Draw(panel, particles);
+        Grid grid = new Grid(panel.getSimWidth(), panel.getSimHeight());
+        Draw draw = new Draw(panel, particles, grid);
         draw.drawCursor();
 
-        SimulationLoop loop = createLoop(panel, particles, draw);
+        SimulationLoop loop = createLoop(panel, particles, draw, grid);
 
         addControls(panel, loop);
         frame.setVisible(true);
@@ -55,10 +56,9 @@ public class Display {
         return particles;
     }
 
-    private static SimulationLoop createLoop(SimulationPanel panel, Particles particles, Draw draw) {
+    private static SimulationLoop createLoop(SimulationPanel panel, Particles particles, Draw draw, Grid grid) {
         int w = panel.getSimWidth();
         int h = panel.getSimHeight();
-        Grid grid = new Grid(w, h);
         return new SimulationLoop(TARGET_FPS,
                 () -> particles.step(SimulationLoop.DT, w, h, grid),
                 draw::redraw);
@@ -71,6 +71,15 @@ public class Display {
         slider.setPreferredSize(new Dimension(150, 20));
         slider.setOpaque(false);
         panel.add(slider);
+
+        JCheckBox gridToggle = new JCheckBox("Show Grid");
+        gridToggle.setForeground(Color.WHITE);
+        gridToggle.setBackground(Color.BLACK);
+        gridToggle.addActionListener(e -> {
+            panel.setShowGrid(gridToggle.isSelected());
+            panel.repaint();
+        });
+        panel.add(gridToggle);
 
         JLabel stats = new JLabel("FPS: -");
         stats.setForeground(Color.WHITE);

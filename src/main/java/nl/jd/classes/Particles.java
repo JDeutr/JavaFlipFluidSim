@@ -49,6 +49,7 @@ public class Particles {
     public void step(float dt, int width, int height, Grid grid) {
         integrate(dt, width, height);
         markGridCells(grid);
+        grid.p2g(x, y, vx, vy, count);
         publish();
     }
 

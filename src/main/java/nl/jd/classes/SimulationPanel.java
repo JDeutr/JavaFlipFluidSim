@@ -9,6 +9,7 @@ public class SimulationPanel extends JPanel {
     final int[] pixels;
     private final int width, height;
     private final BufferedImage visuals;
+    private boolean showGrid = false;
 
     public SimulationPanel(int width, int height) {
         this.width = width;
@@ -33,6 +34,33 @@ public class SimulationPanel extends JPanel {
 
     public void clear(int rgb) {
         java.util.Arrays.fill(pixels, rgb);
+    }
+
+    public boolean isShowGrid() {
+        return showGrid;
+    }
+
+    public void setShowGrid(boolean showGrid) {
+        this.showGrid = showGrid;
+    }
+
+    public void drawGrid(Grid grid, int rgb) {
+        int cellSize = grid.getCellSize();
+        int cols = grid.getCols();
+        int rows = grid.getRows();
+
+        for (int row = 0; row <= rows; row++) {
+            int y = row * cellSize;
+            for (int x = 0; x < width; x++) {
+                setPixel(x, y, rgb);
+            }
+        }
+        for (int col = 0; col <= cols; col++) {
+            int x = col * cellSize;
+            for (int y = 0; y < height; y++) {
+                setPixel(x, y, rgb);
+            }
+        }
     }
 
     @Override

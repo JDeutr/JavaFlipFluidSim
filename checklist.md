@@ -17,7 +17,7 @@
 ## Phase 3: Particles to Grid (P2G)
 - [x] Add `u[]` and `v[]` arrays to `Grid` (velocity fields)
 - [x] Add `uWeight[]` and `vWeight[]` arrays for accumulation
-- [ ] Implement bilinear interpolation for velocity face influence
+- [x] Implement bilinear interpolation for velocity face influence
 - [ ] **P2G step**: Accumulate `particle.vx * weight` into `u` faces
 - [ ] **P2G step**: Accumulate `particle.vy * weight` into `v` faces
 - [ ] **P2G step**: Normalize `u` and `v` by dividing by weights (if weight > 0)
