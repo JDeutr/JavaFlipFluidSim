@@ -1,5 +1,6 @@
 package nl.jd.display;
 
+import nl.jd.classes.Grid;
 import nl.jd.classes.Particles;
 import nl.jd.classes.SimulationLoop;
 import nl.jd.classes.SimulationPanel;
@@ -57,8 +58,9 @@ public class Display {
     private static SimulationLoop createLoop(SimulationPanel panel, Particles particles, Draw draw) {
         int w = panel.getSimWidth();
         int h = panel.getSimHeight();
+        Grid grid = new Grid(w, h);
         return new SimulationLoop(TARGET_FPS,
-                () -> particles.step(SimulationLoop.DT, w, h),
+                () -> particles.step(SimulationLoop.DT, w, h, grid),
                 draw::redraw);
     }
 
