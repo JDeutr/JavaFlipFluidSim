@@ -18,11 +18,11 @@
 - [x] Add `u[]` and `v[]` arrays to `Grid` (velocity fields)
 - [x] Add `uWeight[]` and `vWeight[]` arrays for accumulation
 - [x] Implement bilinear interpolation for velocity face influence
-- [ ] **P2G step**: Accumulate `particle.vx * weight` into `u` faces
-- [ ] **P2G step**: Accumulate `particle.vy * weight` into `v` faces
-- [ ] **P2G step**: Normalize `u` and `v` by dividing by weights (if weight > 0)
-- [ ] Handle edge cases (particles near grid boundaries)
-- [ ] Reset `uWeight` and `vWeight` to zero every frame before accumulation
+- [x] **P2G step**: Accumulate `particle.vx * weight` into `u` faces
+- [x] **P2G step**: Accumulate `particle.vy * weight` into `v` faces
+- [x] **P2G step**: Normalize `u` and `v` by dividing by weights (if weight > 0)
+- [x] Handle edge cases (particles near grid boundaries)
+- [x] Reset `uWeight` and `vWeight` to zero every frame before accumulation
 
 ## Phase 4: The Pressure Solve
 - [ ] Add `pressure[]` array to `Grid`

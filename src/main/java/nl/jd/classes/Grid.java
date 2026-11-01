@@ -104,71 +104,71 @@ public class Grid {
 
     public void p2g(float[] px, float[] py, float[] pvx, float[] pvy, int count) {
         resetWeights();
-
         for (int i = 0; i < count; i++) {
-            float particleX = px[i];
-            float particleY = py[i];
-            float particleVx = pvx[i];
-            float particleVy = pvy[i];
-
-            int cellCol = getCol(particleX);
-            int cellRow = getRow(particleY);
-
-            float fracX = (particleX / cellSize) - (int) (particleX / cellSize);
-            float fracY = (particleY / cellSize) - (int) (particleY / cellSize);
-
-            float wLeft = 1f - fracX;
-            float wRight = fracX;
-            float wTop = 1f - fracY;
-            float wBottom = fracY;
-
-            // u-velocity (vertical faces)
-            int uTL = getUIndex(cellRow, cellCol);
-            int uTR = getUIndex(cellRow, cellCol + 1);
-            int uBL = getUIndex(cellRow + 1, cellCol);
-            int uBR = getUIndex(cellRow + 1, cellCol + 1);
-
-            u[uTL] += particleVx * wLeft * wTop;
-            uWeight[uTL] += wLeft * wTop;
-
-            u[uTR] += particleVx * wRight * wTop;
-            uWeight[uTR] += wRight * wTop;
-
-            u[uBL] += particleVx * wLeft * wBottom;
-            uWeight[uBL] += wLeft * wBottom;
-
-            u[uBR] += particleVx * wRight * wBottom;
-            uWeight[uBR] += wRight * wBottom;
-
-            // v-velocity (horizontal faces)
-            int vTL = getVIndex(cellRow, cellCol);
-            int vTR = getVIndex(cellRow, cellCol + 1);
-            int vBL = getVIndex(cellRow + 1, cellCol);
-            int vBR = getVIndex(cellRow + 1, cellCol + 1);
-
-            v[vTL] += particleVy * wTop * wLeft;
-            vWeight[vTL] += wTop * wLeft;
-
-            v[vTR] += particleVy * wTop * wRight;
-            vWeight[vTR] += wTop * wRight;
-
-            v[vBL] += particleVy * wBottom * wLeft;
-            vWeight[vBL] += wBottom * wLeft;
-
-            v[vBR] += particleVy * wBottom * wRight;
-            vWeight[vBR] += wBottom * wRight;
+            accumulateParticle(px[i], py[i], pvx[i], pvy[i]);
         }
+        normalize();
+    }
 
-        // Normalize
+    private void accumulateParticle(float px, float py, float pvx, float pvy) {
+        int cellCol = clamp(getCol(px), cols - 2);
+        int cellRow = clamp(getRow(py), rows - 2);
+
+        float fracX = px / cellSize - (int) (px / cellSize);
+        float fracY = py / cellSize - (int) (py / cellSize);
+
+        accumulateU(pvx, cellCol, cellRow, fracX, fracY);
+        accumulateV(pvy, cellCol, cellRow, fracX, fracY);
+    }
+
+    private void accumulateU(float pvx, int cellCol, int cellRow, float wRight, float wBottom) {
+        float wLeft = 1f - wRight;
+        float wTop = 1f - wBottom;
+
+        int uTL = getUIndex(cellRow, cellCol);
+        int uTR = getUIndex(cellRow, cellCol + 1);
+        int uBL = getUIndex(cellRow + 1, cellCol);
+        int uBR = getUIndex(cellRow + 1, cellCol + 1);
+
+        u[uTL] += pvx * wLeft * wTop;
+        uWeight[uTL] += wLeft * wTop;
+        u[uTR] += pvx * wRight * wTop;
+        uWeight[uTR] += wRight * wTop;
+        u[uBL] += pvx * wLeft * wBottom;
+        uWeight[uBL] += wLeft * wBottom;
+        u[uBR] += pvx * wRight * wBottom;
+        uWeight[uBR] += wRight * wBottom;
+    }
+
+    private void accumulateV(float pvy, int cellCol, int cellRow, float wRight, float wBottom) {
+        float wLeft = 1f - wRight;
+        float wTop = 1f - wBottom;
+
+        int vTL = getVIndex(cellRow, cellCol);
+        int vTR = getVIndex(cellRow, cellCol + 1);
+        int vBL = getVIndex(cellRow + 1, cellCol);
+        int vBR = getVIndex(cellRow + 1, cellCol + 1);
+
+        v[vTL] += pvy * wTop * wLeft;
+        vWeight[vTL] += wTop * wLeft;
+        v[vTR] += pvy * wTop * wRight;
+        vWeight[vTR] += wTop * wRight;
+        v[vBL] += pvy * wBottom * wLeft;
+        vWeight[vBL] += wBottom * wLeft;
+        v[vBR] += pvy * wBottom * wRight;
+        vWeight[vBR] += wBottom * wRight;
+    }
+
+    private void normalize() {
         for (int i = 0; i < u.length; i++) {
-            if (uWeight[i] > 0) {
-                u[i] /= uWeight[i];
-            }
+            if (uWeight[i] > 0) u[i] /= uWeight[i];
         }
         for (int i = 0; i < v.length; i++) {
-            if (vWeight[i] > 0) {
-                v[i] /= vWeight[i];
-            }
+            if (vWeight[i] > 0) v[i] /= vWeight[i];
         }
+    }
+
+    private int clamp(int val, int max) {
+        return Math.clamp(val, 0, max);
     }
 }
