@@ -4,6 +4,9 @@ import java.util.Arrays;
 
 public class Particles {
     static final float GRAVITY = 200f;
+    /** Minimum particle distance for separation; roughly the initial spacing (see Display.createParticles). */
+    static final float MIN_DIST = 1f;
+
     public final float[] x, y, vx, vy;
     public int count = 0;
     private volatile float[][] snapshot;
@@ -47,9 +50,27 @@ public class Particles {
     }
 
     public void step(float dt, int width, int height, Grid grid) {
+        // 1. advect particles
         integrate(dt, width, height);
+        grid.guardParticles(x, y, vx, vy, count, width, height);
+
+        // 2. keep particles from overlapping, then re-clamp to the walls
+        grid.separateParticles(x, y, count, MIN_DIST, width, height);
+        enforceBounds(width, height);
+
+        // 3. particles -> grid
         markGridCells(grid);
         grid.p2g(x, y, vx, vy, count);
+        grid.zeroSolidFaces();
+        grid.saveBefore();
+
+        // 4. make the grid velocity field incompressible
+        grid.solvePressure();
+
+        // 5. grid -> particles (FLIP/PIC blend)
+        grid.applyFlip(x, y, vx, vy, count);
+
+        grid.updateSnapshot();
         publish();
     }
 
@@ -63,8 +84,13 @@ public class Particles {
         }
     }
 
+    private void enforceBounds(int width, int height) {
+        for (int i = 0; i < count; i++) {
+            borderChecks(width, height, i);
+        }
+    }
+
     private void borderChecks(int width, int height, int i) {
-        // Wall Checks
         if (x[i] < 0) {
             x[i] = 0;
             vx[i] = 0;
@@ -91,7 +117,5 @@ public class Particles {
             int col = grid.getCol(x[i]);
             grid.setCellToType(row, col, Grid.FLUID);
         }
-
-        grid.updateSnapshot();
     }
 }
