@@ -1,6 +1,7 @@
 package nl.jd.display;
 
 import nl.jd.classes.Grid;
+import nl.jd.classes.Interaction;
 import nl.jd.classes.Particles;
 import nl.jd.classes.SimulationPanel;
 
@@ -8,14 +9,18 @@ import javax.swing.*;
 import java.awt.event.InputEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.event.MouseWheelEvent;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public class Draw {
-    static volatile int pixelSize = 2;
+    static volatile int pixelSize = 1;
     private final SimulationPanel simulationPanel;
     private final Particles particles;
     private final Grid grid;
     private final AtomicBoolean redrawPending = new AtomicBoolean(false);
+    private volatile Consumer<Runnable> physicsExecutor = Runnable::run;
+    private float lastPaintX = Float.NaN, lastPaintY = Float.NaN;
 
     public Draw(SimulationPanel simulationPanel, Particles particles, Grid grid) {
         this.simulationPanel = simulationPanel;
@@ -23,17 +28,41 @@ public class Draw {
         this.grid = grid;
     }
 
+    public void setPhysicsExecutor(Consumer<Runnable> physicsExecutor) {
+        this.physicsExecutor = physicsExecutor;
+    }
+
     public void redraw() {
         if (!redrawPending.compareAndSet(false, true)) return;
         SwingUtilities.invokeLater(() -> {
             try {
                 simulationPanel.clear(0x000000);
+                drawObstacles();
                 drawParticles();
+                drawPointer();
                 simulationPanel.repaint();
             } finally {
                 redrawPending.set(false);
             }
         });
+    }
+
+    private void drawObstacles() {
+        int[] types = grid.getSnapshotType();
+        if (types == null) return;
+        int h = grid.getCellSize();
+
+        for (int row = 1; row < grid.getRows() - 1; row++) {
+            for (int col = 1; col < grid.getCols() - 1; col++) {
+                if (types[grid.getCellIndex(row, col)] != Grid.SOLID) continue;
+                int x0 = (col - 1) * h, y0 = (row - 1) * h;
+                for (int dy = 0; dy < h; dy++) {
+                    for (int dx = 0; dx < h; dx++) {
+                        simulationPanel.setPixel(x0 + dx, y0 + dy, 0x888888);
+                    }
+                }
+            }
+        }
     }
 
     private void drawParticles() {
@@ -47,6 +76,29 @@ public class Draw {
         if (grid != null && simulationPanel.isShowGrid()) {
             drawVelocityArrows(grid);
             simulationPanel.drawGrid(grid, 0xFF0000);
+        }
+    }
+
+    private void drawPointer() {
+        Interaction in = particles.getInteraction();
+        if (!in.hovering) return;
+        switch (in.mode) {
+            case Interaction.DRAG -> drawRing(in.x, in.y, in.radius, 0x00FF00);
+            case Interaction.REPEL -> drawRing(in.x, in.y, in.radius, 0xFF4444);
+            case Interaction.OBSTACLE_ADD -> drawRing(in.x, in.y, in.brushRadius, 0xFFFFFF);
+            case Interaction.OBSTACLE_ERASE -> drawRing(in.x, in.y, in.brushRadius, 0xFF8800);
+            default -> {
+                if (in.ctrlDown) drawRing(in.x, in.y, in.brushRadius, 0xFFFF00);
+                else drawRing(in.x, in.y, in.radius, 0x888888);
+            }
+        }
+    }
+
+    private void drawRing(float cx, float cy, float r, int rgb) {
+        int steps = Math.max(16, (int) (2 * Math.PI * r));
+        for (int i = 0; i < steps; i++) {
+            double a = 2 * Math.PI * i / steps;
+            simulationPanel.setPixel((int) (cx + r * Math.cos(a)), (int) (cy + r * Math.sin(a)), rgb);
         }
     }
 
@@ -93,29 +145,112 @@ public class Draw {
         }
     }
 
+    // Left: drag fluid. Right: push it away. Wheel: radius.
+    // Ctrl+Left: add obstacle. Ctrl+Right: erase obstacle. Ctrl+Wheel: brush size.
     public void drawCursor() {
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override
+            public void mouseMoved(MouseEvent e) {
+                updatePointer(e);
+            }
+
+            @Override
             public void mousePressed(MouseEvent e) {
-                draw(e);
+                updatePointer(e);
             }
 
             @Override
             public void mouseDragged(MouseEvent e) {
-                draw(e);
+                updatePointer(e);
+            }
+
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                updatePointer(e, false);
+                particles.getInteraction().mode = Interaction.NONE;
+                resetStroke();
+            }
+
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                updatePointer(e);
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                int buttons = InputEvent.BUTTON1_DOWN_MASK | InputEvent.BUTTON3_DOWN_MASK;
+                if ((e.getModifiersEx() & buttons) == 0) {
+                    particles.getInteraction().hovering = false;
+                    resetStroke();
+                }
+            }
+
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent e) {
+                Interaction in = particles.getInteraction();
+                if (e.isControlDown()) {
+                    in.brushRadius = Math.clamp(in.brushRadius - e.getWheelRotation() * 1f, 1f, 40f);
+                } else {
+                    in.radius = Math.clamp(in.radius - e.getWheelRotation() * 3f, 5f, 80f);
+                }
             }
         };
         simulationPanel.addMouseListener(mouseAdapter);
         simulationPanel.addMouseMotionListener(mouseAdapter);
+        simulationPanel.addMouseWheelListener(mouseAdapter);
     }
 
-    private void draw(MouseEvent e) {
-        int x = e.getX() * simulationPanel.getSimWidth() / simulationPanel.getWidth();
-        int y = e.getY() * simulationPanel.getSimHeight() / simulationPanel.getHeight();
-        int color = (e.getModifiersEx() & InputEvent.BUTTON1_DOWN_MASK) != 0 ? 0xFFFFFF : 0x000000;
+    private void updatePointer(MouseEvent e) {
+        updatePointer(e, true);
+    }
 
-        drawDot(x, y, color);
-        simulationPanel.repaint();
+    private void updatePointer(MouseEvent e, boolean allowPaint) {
+        Interaction in = particles.getInteraction();
+        in.x = e.getX() * (float) simulationPanel.getSimWidth() / simulationPanel.getWidth();
+        in.y = e.getY() * (float) simulationPanel.getSimHeight() / simulationPanel.getHeight();
+        in.hovering = true;
+
+        int m = e.getModifiersEx();
+        boolean ctrl = (m & InputEvent.CTRL_DOWN_MASK) != 0;
+        boolean left = (m & InputEvent.BUTTON1_DOWN_MASK) != 0;
+        boolean right = (m & InputEvent.BUTTON3_DOWN_MASK) != 0;
+        in.ctrlDown = ctrl;
+
+        if (ctrl && right) in.mode = Interaction.OBSTACLE_ERASE;
+        else if (ctrl && left) in.mode = Interaction.OBSTACLE_ADD;
+        else if (right) in.mode = Interaction.REPEL;
+        else if (left) in.mode = Interaction.DRAG;
+        else in.mode = Interaction.NONE;
+
+        if (allowPaint && in.mode == Interaction.OBSTACLE_ADD) paintStroke(in.x, in.y, true);
+        else if (allowPaint && in.mode == Interaction.OBSTACLE_ERASE) paintStroke(in.x, in.y, false);
+        else resetStroke();
+    }
+
+    private void resetStroke() {
+        lastPaintX = Float.NaN;
+        lastPaintY = Float.NaN;
+    }
+
+    private void paintStroke(float x, float y, boolean solid) {
+        float r = particles.getInteraction().brushRadius;
+        float fromX = Float.isNaN(lastPaintX) ? x : lastPaintX;
+        float fromY = Float.isNaN(lastPaintY) ? y : lastPaintY;
+        lastPaintX = x;
+        lastPaintY = y;
+
+        float dx = x - fromX, dy = y - fromY;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
+        int stamps = Math.max(1, (int) Math.ceil(dist / Math.max(1f, r * 0.5f)));
+
+        physicsExecutor.accept(() -> {
+            boolean changed = false;
+            for (int s = 1; s <= stamps; s++) {
+                float t = (float) s / stamps;
+                changed |= grid.paintObstacle(fromX + dx * t, fromY + dy * t, r, solid);
+            }
+            if (changed) grid.updateSnapshot();
+        });
     }
 
     private void drawDot(int x, int y, int rgb) {

@@ -1,5 +1,8 @@
 package nl.jd.classes;
 
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 
 public class SimulationLoop {
@@ -9,7 +12,11 @@ public class SimulationLoop {
     private final int frameRate;
     private final Runnable update, render;
     private volatile boolean running;
+    private volatile boolean paused;
     private volatile int measuredFps, measuredSteps;
+
+    private final AtomicInteger pendingSteps = new AtomicInteger();
+    private final Queue<Runnable> physicsTasks = new ConcurrentLinkedQueue<>();
 
     public SimulationLoop(int frameRate, Runnable update, Runnable render) {
         this.frameRate = frameRate;
@@ -28,6 +35,47 @@ public class SimulationLoop {
         running = false;
     }
 
+    public boolean isPaused() {
+        return paused;
+    }
+
+    public void setPaused(boolean paused) {
+        this.paused = paused;
+    }
+
+    public boolean togglePause() {
+        paused = !paused;
+        return paused;
+    }
+
+    public void stepOnce() {
+        paused = true;
+        pendingSteps.incrementAndGet();
+    }
+
+    public void runOnPhysicsThread(Runnable task) {
+        physicsTasks.add(task);
+    }
+
+    private void runUpdate() {
+        try {
+            update.run();
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void drainTasks() {
+        Runnable task;
+        while ((task = physicsTasks.poll()) != null) {
+            try {
+                task.run();
+            } catch (RuntimeException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private void physicsLoop() {
         final long maxFrameNanos = 250_000_000L;
         long previous = System.nanoTime();
@@ -40,14 +88,22 @@ public class SimulationLoop {
             accumulator += Math.min(now - previous, maxFrameNanos);
             previous = now;
 
-            while (accumulator >= TIME_STEP) {
-                try {
-                    update.run();
-                } catch (RuntimeException e) {
-                    e.printStackTrace();
+            drainTasks();
+
+            if (paused) {
+                accumulator = 0;
+                int n = pendingSteps.getAndSet(0);
+                for (int i = 0; i < n; i++) {
+                    runUpdate();
+                    steps++;
                 }
-                accumulator -= TIME_STEP;
-                steps++;
+            } else {
+                pendingSteps.set(0);
+                while (accumulator >= TIME_STEP) {
+                    runUpdate();
+                    accumulator -= TIME_STEP;
+                    steps++;
+                }
             }
 
             if (now - counterStart >= 1_000_000_000L) {

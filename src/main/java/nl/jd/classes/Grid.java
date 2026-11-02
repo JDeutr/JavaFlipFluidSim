@@ -12,12 +12,13 @@ public class Grid {
     private volatile int[] snapshotType;
     private volatile float[] snapshotU, snapshotV;
 
-    private int pressureIterations = 50;
-    private float divergenceThreshold = 1e-3f;
-    private float flipRatio = 0.75f;
-    private float overRelaxation = 1.5f;
-    private float driftStiffness = 1f;
-    private float restDensity = 0f;
+    private volatile int pressureIterations = 50;
+    private volatile float divergenceThreshold = 1e-3f;
+    private volatile float flipRatio = 0.75f;
+    private volatile float overRelaxation = 1.5f;
+    private volatile float driftStiffness = 1f;
+    private volatile float restDensity = 0f;
+    private boolean restDensityFixed = false;
 
     private int[] cellStart, cellEntries;
 
@@ -94,6 +95,110 @@ public class Grid {
 
     public int getRow(float y) {
         return (int) (y / cellSize) + 1;
+    }
+
+    public void markFluid(int row, int col) {
+        if (row > 0 && row < rows - 1 && col > 0 && col < cols - 1) {
+            int idx = getCellIndex(row, col);
+            if (cellType[idx] != SOLID) cellType[idx] = FLUID;
+        }
+    }
+
+    public boolean paintObstacle(float simX, float simY, float radius, boolean solid) {
+        int rMin = Math.max(1, getRow(simY - radius));
+        int rMax = Math.min(rows - 2, getRow(simY + radius));
+        int cMin = Math.max(1, getCol(simX - radius));
+        int cMax = Math.min(cols - 2, getCol(simX + radius));
+        int centerRow = getRow(simY), centerCol = getCol(simX);
+        float r2 = radius * radius;
+        boolean changed = false;
+
+        for (int row = rMin; row <= rMax; row++) {
+            for (int col = cMin; col <= cMax; col++) {
+                float dx = (col - 0.5f) * cellSize - simX;
+                float dy = (row - 0.5f) * cellSize - simY;
+                boolean inBrush = dx * dx + dy * dy <= r2 || (row == centerRow && col == centerCol);
+                if (!inBrush) continue;
+
+                int idx = getCellIndex(row, col);
+                if (solid && cellType[idx] != SOLID) {
+                    cellType[idx] = SOLID;
+                    changed = true;
+                } else if (!solid && cellType[idx] == SOLID) {
+                    cellType[idx] = AIR;
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    public void clearObstacles() {
+        for (int row = 1; row < rows - 1; row++) {
+            for (int col = 1; col < cols - 1; col++) {
+                int idx = getCellIndex(row, col);
+                if (cellType[idx] == SOLID) cellType[idx] = AIR;
+            }
+        }
+    }
+
+    public void resolveSolidCollisions(float[] px, float[] py, float[] pvx, float[] pvy, int count) {
+        for (int i = 0; i < count; i++) {
+            int row = getRow(py[i]), col = getCol(px[i]);
+            if (row < 1 || row > rows - 2 || col < 1 || col > cols - 2) continue;
+            if (cellType[getCellIndex(row, col)] != SOLID) continue;
+            pushOut(px, py, pvx, pvy, i, row, col);
+        }
+    }
+
+    private void pushOut(float[] px, float[] py, float[] pvx, float[] pvy, int i, int row, int col) {
+        int ci = getCellIndex(row, col);
+        float h = cellSize, eps = 0.01f;
+        float left = (col - 1) * h, right = col * h;
+        float top = (row - 1) * h, bottom = row * h;
+
+        float best = Float.MAX_VALUE;
+        int dir = -1;
+        if (cellType[ci - 1] != SOLID && px[i] - left < best) { best = px[i] - left; dir = 0; }
+        if (cellType[ci + 1] != SOLID && right - px[i] < best) { best = right - px[i]; dir = 1; }
+        if (cellType[ci - cols] != SOLID && py[i] - top < best) { best = py[i] - top; dir = 2; }
+        if (cellType[ci + cols] != SOLID && bottom - py[i] < best) { best = bottom - py[i]; dir = 3; }
+
+        switch (dir) {
+            case 0 -> { px[i] = left - eps; pvx[i] = Math.min(pvx[i], 0f); }
+            case 1 -> { px[i] = right + eps; pvx[i] = Math.max(pvx[i], 0f); }
+            case 2 -> { py[i] = top - eps; pvy[i] = Math.min(pvy[i], 0f); }
+            case 3 -> { py[i] = bottom + eps; pvy[i] = Math.max(pvy[i], 0f); }
+            default -> teleportToNearestOpenCell(px, py, pvx, pvy, i, row, col);
+        }
+    }
+
+    private void teleportToNearestOpenCell(float[] px, float[] py, float[] pvx, float[] pvy,
+                                           int i, int row, int col) {
+        float bestD2 = Float.MAX_VALUE;
+        int bestRow = -1, bestCol = -1;
+        for (int radius = 2; radius <= 15 && bestRow < 0; radius++) {
+            for (int dr = -radius; dr <= radius; dr++) {
+                for (int dc = -radius; dc <= radius; dc++) {
+                    if (Math.max(Math.abs(dr), Math.abs(dc)) != radius) continue;
+                    int r = row + dr, c = col + dc;
+                    if (r < 1 || r > rows - 2 || c < 1 || c > cols - 2) continue;
+                    if (cellType[getCellIndex(r, c)] == SOLID) continue;
+                    float cx = (c - 0.5f) * cellSize, cy = (r - 0.5f) * cellSize;
+                    float d2 = (cx - px[i]) * (cx - px[i]) + (cy - py[i]) * (cy - py[i]);
+                    if (d2 < bestD2) {
+                        bestD2 = d2;
+                        bestRow = r;
+                        bestCol = c;
+                    }
+                }
+            }
+        }
+        if (bestRow < 0) return;
+        px[i] = (bestCol - 0.5f) * cellSize;
+        py[i] = (bestRow - 0.5f) * cellSize;
+        pvx[i] = 0f;
+        pvy[i] = 0f;
     }
 
     public int getCellType(int index) {
@@ -229,6 +334,7 @@ public class Grid {
     private void updateDensity(float[] px, float[] py, int count) {
         Arrays.fill(density, 0f);
         for (int i = 0; i < count; i++) {
+
             float x = px[i] / cellSize + 0.5f;
             float y = py[i] / cellSize + 0.5f;
             int x0 = (int) x, y0 = (int) y;
@@ -519,5 +625,26 @@ public class Grid {
 
     public void setDriftStiffness(float driftStiffness) {
         this.driftStiffness = driftStiffness;
+    }
+
+    public void setParticleSpacing(float spacing) {
+        float perCell = cellSize / spacing;
+        this.restDensity = perCell * perCell;
+        this.restDensityFixed = true;
+    }
+
+    public float getRestDensity() {
+        return restDensity;
+    }
+
+    public void reset() {
+        Arrays.fill(u, 0f);
+        Arrays.fill(v, 0f);
+        Arrays.fill(uBefore, 0f);
+        Arrays.fill(vBefore, 0f);
+        Arrays.fill(pressure, 0f);
+        Arrays.fill(density, 0f);
+        cellTypesToAir();
+        if (!restDensityFixed) restDensity = 0f;
     }
 }

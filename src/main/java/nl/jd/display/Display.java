@@ -12,6 +12,7 @@ import java.awt.event.ActionListener;
 public class Display {
     private static final int TARGET_FPS = 144;
     private static final int PARTICLE_COUNT = 25_000;
+    private static final float PARTICLE_SPACING = 1f;
     public static Dimension screen;
 
     public static void main(String[] args) {
@@ -21,14 +22,30 @@ public class Display {
         SimulationPanel panel = new SimulationPanel(screen.width / 4, screen.height / 4);
         frame.add(panel, BorderLayout.CENTER);
 
-        Particles particles = createParticles(panel.getSimWidth(), panel.getSimHeight());
-        Grid grid = new Grid(panel.getSimWidth(), panel.getSimHeight());
+        int w = panel.getSimWidth();
+        int h = panel.getSimHeight();
+
+        Particles particles = new Particles(PARTICLE_COUNT);
+        fillParticles(particles, w, h);
+        Grid grid = new Grid(w, h);
+        grid.setParticleSpacing(PARTICLE_SPACING);
         Draw draw = new Draw(panel, particles, grid);
         draw.drawCursor();
 
         SimulationLoop loop = createLoop(panel, particles, draw, grid);
+        draw.setPhysicsExecutor(loop::runOnPhysicsThread);
+        Runnable reset = () -> loop.runOnPhysicsThread(() -> {
+            fillParticles(particles, w, h);
+            grid.reset();
+            particles.publish();
+            grid.updateSnapshot();
+        });
 
         addControls(panel, loop);
+        ControlPanel controls = new ControlPanel(panel, grid, particles, loop, reset);
+        frame.add(controls, BorderLayout.EAST);
+        controls.installKeys(frame.getRootPane());
+
         frame.setVisible(true);
         loop.start();
     }
@@ -41,19 +58,17 @@ public class Display {
         return frame;
     }
 
-    private static Particles createParticles(int w, int h) {
-        float spacing = (float) 1;
-        int cols = (int) (w / spacing);
+    private static void fillParticles(Particles particles, int w, int h) {
+        int cols = (int) (w / PARTICLE_SPACING);
         float startY = h * 0.15f;
 
-        Particles particles = new Particles(PARTICLE_COUNT);
+        particles.clear();
         for (int i = 0; i < PARTICLE_COUNT; i++) {
             int currCol = i % cols;
             int currRow = i / cols;
-            particles.add(currCol * spacing,
-                    startY + currRow * spacing);
+            particles.add(currCol * PARTICLE_SPACING,
+                    startY + currRow * PARTICLE_SPACING);
         }
-        return particles;
     }
 
     private static SimulationLoop createLoop(SimulationPanel panel, Particles particles, Draw draw, Grid grid) {
@@ -67,20 +82,6 @@ public class Display {
     private static void addControls(SimulationPanel panel, SimulationLoop loop) {
         panel.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 5));
 
-        PixelSlider slider = new PixelSlider();
-        slider.setPreferredSize(new Dimension(150, 20));
-        slider.setOpaque(false);
-        panel.add(slider);
-
-        JCheckBox gridToggle = new JCheckBox("Show Grid");
-        gridToggle.setForeground(Color.WHITE);
-        gridToggle.setBackground(Color.BLACK);
-        gridToggle.addActionListener(e -> {
-            panel.setShowGrid(gridToggle.isSelected());
-            panel.repaint();
-        });
-        panel.add(gridToggle);
-
         JLabel stats = new JLabel("FPS: -");
         stats.setForeground(Color.WHITE);
         panel.add(stats);
@@ -90,7 +91,8 @@ public class Display {
 
     private static void startStatsUpdates(JLabel label, SimulationLoop loop) {
         ActionListener refresh = e -> label.setText("FPS: " + loop.getFramesPerSecond()
-                + "  Steps/s: " + loop.getStepsPerSecond());
+                + "  Steps/s: " + loop.getStepsPerSecond()
+                + (loop.isPaused() ? "  [PAUSED]" : ""));
         new Timer(500, refresh).start();
     }
 }
