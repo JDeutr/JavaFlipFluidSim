@@ -6,7 +6,7 @@ import javax.swing.event.ChangeListener;
 
 public class PixelSlider extends JSlider implements ChangeListener {
     static final int MIN_SIZE = Draw.pixelSize;
-    static final int MAX_SIZE = MIN_SIZE * 2;
+    static final int MAX_SIZE = MIN_SIZE * 4;
 
     public PixelSlider() {
         super(MIN_SIZE, MAX_SIZE, MIN_SIZE);

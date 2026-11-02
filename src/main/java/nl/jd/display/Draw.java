@@ -23,9 +23,6 @@ public class Draw {
         this.grid = grid;
     }
 
-    // The render callback: called from the render thread, returns immediately.
-    // If the EDT hasn't finished the previous frame yet, this frame is skipped
-    // instead of piling up another invokeLater.
     public void redraw() {
         if (!redrawPending.compareAndSet(false, true)) return;
         SwingUtilities.invokeLater(() -> {

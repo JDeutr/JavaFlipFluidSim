@@ -42,7 +42,7 @@ public class Display {
     }
 
     private static Particles createParticles(int w, int h) {
-        float spacing = (float) Draw.pixelSize / 2;
+        float spacing = (float) 1;
         int cols = (int) (w / spacing);
         float startY = h * 0.15f;
 

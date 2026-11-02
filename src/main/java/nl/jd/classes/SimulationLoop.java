@@ -3,7 +3,7 @@ package nl.jd.classes;
 import java.util.concurrent.locks.LockSupport;
 
 public class SimulationLoop {
-    static final long TIME_STEP = 1_000_000_000L / 60;
+    static final long TIME_STEP = 1_000_000_000L / 144;
     public static final float DT = TIME_STEP / 1e9f;
 
     private final int frameRate;

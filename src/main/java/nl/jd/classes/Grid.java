@@ -14,16 +14,15 @@ public class Grid {
 
     private int pressureIterations = 50;
     private float divergenceThreshold = 1e-3f;
-    private float flipRatio = 0.95f;
-    private float overRelaxation = 1.9f;
-    private float driftStiffness = 1f;   // tune: higher = stronger push-apart of over-dense cells
-    private float restDensity = 0f;      // measured on the first frame
+    private float flipRatio = 0.75f;
+    private float overRelaxation = 1.5f;
+    private float driftStiffness = 1f;
+    private float restDensity = 0f;
 
-    // spatial hash scratch buffers for separateParticles
     private int[] cellStart, cellEntries;
 
     public Grid(int simWidth, int simHeight) {
-        this.cellSize = 6;
+        this.cellSize = 3;
         this.cols = simWidth / cellSize + 2;
         this.rows = simHeight / cellSize + 2;
         this.cellType = new int[rows * cols];
@@ -58,10 +57,6 @@ public class Grid {
             }
         }
     }
-
-    // ------------------------------------------------------------------
-    // Indexing / accessors
-    // ------------------------------------------------------------------
 
     public int getCellIndex(int row, int col) {
         return row * cols + col;
@@ -129,10 +124,6 @@ public class Grid {
         return vWeight;
     }
 
-    // ------------------------------------------------------------------
-    // Render snapshot
-    // ------------------------------------------------------------------
-
     public void updateSnapshot() {
         snapshotType = Arrays.copyOf(cellType, cellType.length);
         snapshotU = Arrays.copyOf(u, u.length);
@@ -150,10 +141,6 @@ public class Grid {
     public float[] getSnapshotV() {
         return snapshotV;
     }
-
-    // ------------------------------------------------------------------
-    // Particles -> grid
-    // ------------------------------------------------------------------
 
     public void resetWeights() {
         Arrays.fill(uWeight, 0f);
@@ -239,11 +226,9 @@ public class Grid {
         }
     }
 
-    /** Bilinear particle density at cell centres; rest density is measured on the first frame. */
     private void updateDensity(float[] px, float[] py, int count) {
         Arrays.fill(density, 0f);
         for (int i = 0; i < count; i++) {
-            // cell centres sit at (col + 0.5, row + 0.5) in grid space
             float x = px[i] / cellSize + 0.5f;
             float y = py[i] / cellSize + 0.5f;
             int x0 = (int) x, y0 = (int) y;
@@ -273,11 +258,6 @@ public class Grid {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Grid housekeeping
-    // ------------------------------------------------------------------
-
-    /** Zero every face that touches a SOLID cell. */
     public void zeroSolidFaces() {
         for (int row = 1; row < rows - 1; row++) {
             for (int col = 1; col < cols; col++) {
@@ -299,17 +279,11 @@ public class Grid {
         }
     }
 
-    /** Store the grid velocities before the pressure solve (needed for the FLIP delta). */
     public void saveBefore() {
         System.arraycopy(u, 0, uBefore, 0, u.length);
         System.arraycopy(v, 0, vBefore, 0, v.length);
     }
 
-    // ------------------------------------------------------------------
-    // Pressure solve (Gauss-Seidel, FLUID cells only)
-    // ------------------------------------------------------------------
-
-    /** @return the largest correction applied in the last iteration (convergence indicator). */
     public float solvePressure() {
         Arrays.fill(pressure, 0f);
         float lastMax = 0f;
@@ -320,7 +294,7 @@ public class Grid {
             for (int row = 1; row < rows - 1; row++) {
                 for (int col = 1; col < cols - 1; col++) {
                     int ci = getCellIndex(row, col);
-                    if (cellType[ci] != FLUID) continue;   // AIR cells are the free surface (p = 0)
+                    if (cellType[ci] != FLUID) continue;
 
                     boolean openL = cellType[ci - 1] != SOLID;
                     boolean openR = cellType[ci + 1] != SOLID;
@@ -336,7 +310,6 @@ public class Grid {
 
                     float div = u[uRight] - u[uLeft] + v[vBelow] - v[vAbove];
 
-                    // drift compensation: ask over-dense cells to expand
                     if (restDensity > 0f) {
                         float compression = density[ci] - restDensity;
                         if (compression > 0f) div -= driftStiffness * compression;
@@ -345,7 +318,6 @@ public class Grid {
                     float correction = overRelaxation * div / s;
                     pressure[ci] += correction;
 
-                    // never move faces that touch SOLID
                     if (openL) u[uLeft] += correction;
                     if (openR) u[uRight] -= correction;
                     if (openU) v[vAbove] += correction;
@@ -362,7 +334,6 @@ public class Grid {
         return lastMax;
     }
 
-    /** Debug helper: worst divergence over FLUID cells. */
     public float computeMaxDivergence() {
         float max = 0f;
         for (int row = 1; row < rows - 1; row++) {
@@ -376,10 +347,6 @@ public class Grid {
         }
         return max;
     }
-
-    // ------------------------------------------------------------------
-    // Grid -> particles (FLIP / PIC blend)
-    // ------------------------------------------------------------------
 
     public void applyFlip(float[] px, float[] py, float[] pvx, float[] pvy, int count) {
         for (int i = 0; i < count; i++) {
@@ -445,10 +412,6 @@ public class Grid {
         return above || below;
     }
 
-    // ------------------------------------------------------------------
-    // Particle separation (counting-sort spatial hash, moves positions)
-    // ------------------------------------------------------------------
-
     public void separateParticles(float[] px, float[] py, int count,
                                   float minDist, int simW, int simH) {
         float inv = 1f / minDist;
@@ -471,8 +434,8 @@ public class Grid {
         float min2 = minDist * minDist;
         for (int iter = 0; iter < 2; iter++) {
             for (int i = 0; i < count; i++) {
-                int cx = Math.min(Math.max((int) (px[i] * inv), 0), hw - 1);
-                int cy = Math.min(Math.max((int) (py[i] * inv), 0), hh - 1);
+                int cx = Math.clamp((int) (px[i] * inv), 0, hw - 1);
+                int cy = Math.clamp((int) (py[i] * inv), 0, hh - 1);
                 for (int ny = Math.max(cy - 1, 0); ny <= Math.min(cy + 1, hh - 1); ny++) {
                     for (int nx = Math.max(cx - 1, 0); nx <= Math.min(cx + 1, hw - 1); nx++) {
                         int c = ny * hw + nx;
@@ -497,14 +460,10 @@ public class Grid {
     }
 
     private static int hashOf(float x, float y, float inv, int hw, int hh) {
-        int cx = Math.min(Math.max((int) (x * inv), 0), hw - 1);
-        int cy = Math.min(Math.max((int) (y * inv), 0), hh - 1);
+        int cx = Math.clamp((int) (x * inv), 0, hw - 1);
+        int cy = Math.clamp((int) (y * inv), 0, hh - 1);
         return cy * hw + cx;
     }
-
-    // ------------------------------------------------------------------
-    // Safety
-    // ------------------------------------------------------------------
 
     public void guardParticles(float[] px, float[] py, float[] pvx, float[] pvy,
                                int count, int width, int height) {
@@ -521,10 +480,6 @@ public class Grid {
             if (Float.isNaN(pvy[i]) || Float.isInfinite(pvy[i])) pvy[i] = 0f;
         }
     }
-
-    // ------------------------------------------------------------------
-    // Tunables
-    // ------------------------------------------------------------------
 
     public float getFlipRatio() {
         return flipRatio;
