@@ -191,7 +191,7 @@ public class Draw {
                 if (e.isControlDown()) {
                     in.brushRadius = Math.clamp(in.brushRadius - e.getWheelRotation() * 1f, 1f, 40f);
                 } else {
-                    in.radius = Math.clamp(in.radius - e.getWheelRotation() * 3f, 5f, 80f);
+                    in.radius = Math.clamp(in.radius - e.getWheelRotation() * 3f, 5f, 160f);
                 }
             }
         };
