@@ -40,6 +40,12 @@ public class Grid {
         cellTypesToAir();
     }
 
+    private static int hashOf(float x, float y, float inv, int hw, int hh) {
+        int cx = Math.clamp((int) (x * inv), 0, hw - 1);
+        int cy = Math.clamp((int) (y * inv), 0, hh - 1);
+        return cy * hw + cx;
+    }
+
     private void initSolidBorder() {
         for (int col = 0; col < cols; col++) {
             cellType[getCellIndex(0, col)] = SOLID;
@@ -61,12 +67,6 @@ public class Grid {
 
     public int getCellIndex(int row, int col) {
         return row * cols + col;
-    }
-
-    public void setCellToType(int row, int col, int type) {
-        if (row > 0 && row < rows - 1 && col > 0 && col < cols - 1) {
-            cellType[getCellIndex(row, col)] = type;
-        }
     }
 
     public int getUIndex(int row, int col) {
@@ -159,16 +159,40 @@ public class Grid {
 
         float best = Float.MAX_VALUE;
         int dir = -1;
-        if (cellType[ci - 1] != SOLID && px[i] - left < best) { best = px[i] - left; dir = 0; }
-        if (cellType[ci + 1] != SOLID && right - px[i] < best) { best = right - px[i]; dir = 1; }
-        if (cellType[ci - cols] != SOLID && py[i] - top < best) { best = py[i] - top; dir = 2; }
-        if (cellType[ci + cols] != SOLID && bottom - py[i] < best) { best = bottom - py[i]; dir = 3; }
+        if (cellType[ci - 1] != SOLID && px[i] - left < best) {
+            best = px[i] - left;
+            dir = 0;
+        }
+        if (cellType[ci + 1] != SOLID && right - px[i] < best) {
+            best = right - px[i];
+            dir = 1;
+        }
+        if (cellType[ci - cols] != SOLID && py[i] - top < best) {
+            best = py[i] - top;
+            dir = 2;
+        }
+        if (cellType[ci + cols] != SOLID && bottom - py[i] < best) {
+            best = bottom - py[i];
+            dir = 3;
+        }
 
         switch (dir) {
-            case 0 -> { px[i] = left - eps; pvx[i] = Math.min(pvx[i], 0f); }
-            case 1 -> { px[i] = right + eps; pvx[i] = Math.max(pvx[i], 0f); }
-            case 2 -> { py[i] = top - eps; pvy[i] = Math.min(pvy[i], 0f); }
-            case 3 -> { py[i] = bottom + eps; pvy[i] = Math.max(pvy[i], 0f); }
+            case 0 -> {
+                px[i] = left - eps;
+                pvx[i] = Math.min(pvx[i], 0f);
+            }
+            case 1 -> {
+                px[i] = right + eps;
+                pvx[i] = Math.max(pvx[i], 0f);
+            }
+            case 2 -> {
+                py[i] = top - eps;
+                pvy[i] = Math.min(pvy[i], 0f);
+            }
+            case 3 -> {
+                py[i] = bottom + eps;
+                pvy[i] = Math.max(pvy[i], 0f);
+            }
             default -> teleportToNearestOpenCell(px, py, pvx, pvy, i, row, col);
         }
     }
@@ -199,34 +223,6 @@ public class Grid {
         py[i] = (bestRow - 0.5f) * cellSize;
         pvx[i] = 0f;
         pvy[i] = 0f;
-    }
-
-    public int getCellType(int index) {
-        return cellType[index];
-    }
-
-    public float[] getPressure() {
-        return pressure;
-    }
-
-    public float[] getDensity() {
-        return density;
-    }
-
-    public float[] getUBefore() {
-        return uBefore;
-    }
-
-    public float[] getVBefore() {
-        return vBefore;
-    }
-
-    public float[] getUWeights() {
-        return uWeight;
-    }
-
-    public float[] getVWeights() {
-        return vWeight;
     }
 
     public void updateSnapshot() {
@@ -440,20 +436,6 @@ public class Grid {
         return lastMax;
     }
 
-    public float computeMaxDivergence() {
-        float max = 0f;
-        for (int row = 1; row < rows - 1; row++) {
-            for (int col = 1; col < cols - 1; col++) {
-                if (cellType[getCellIndex(row, col)] != FLUID) continue;
-                float div = u[getUIndex(row, col + 1)] - u[getUIndex(row, col)]
-                        + v[getVIndex(row + 1, col)] - v[getVIndex(row, col)];
-                float abs = Math.abs(div);
-                if (abs > max) max = abs;
-            }
-        }
-        return max;
-    }
-
     public void applyFlip(float[] px, float[] py, float[] pvx, float[] pvy, int count) {
         for (int i = 0; i < count; i++) {
             float gx = px[i] / cellSize + 1;
@@ -565,12 +547,6 @@ public class Grid {
         }
     }
 
-    private static int hashOf(float x, float y, float inv, int hw, int hh) {
-        int cx = Math.clamp((int) (x * inv), 0, hw - 1);
-        int cy = Math.clamp((int) (y * inv), 0, hh - 1);
-        return cy * hw + cx;
-    }
-
     public void guardParticles(float[] px, float[] py, float[] pvx, float[] pvy,
                                int count, int width, int height) {
         for (int i = 0; i < count; i++) {
@@ -603,21 +579,6 @@ public class Grid {
         this.pressureIterations = pressureIterations;
     }
 
-    public float getDivergenceThreshold() {
-        return divergenceThreshold;
-    }
-
-    public void setDivergenceThreshold(float divergenceThreshold) {
-        this.divergenceThreshold = divergenceThreshold;
-    }
-
-    public float getOverRelaxation() {
-        return overRelaxation;
-    }
-
-    public void setOverRelaxation(float overRelaxation) {
-        this.overRelaxation = overRelaxation;
-    }
 
     public float getDriftStiffness() {
         return driftStiffness;
@@ -631,10 +592,6 @@ public class Grid {
         float perCell = cellSize / spacing;
         this.restDensity = perCell * perCell;
         this.restDensityFixed = true;
-    }
-
-    public float getRestDensity() {
-        return restDensity;
     }
 
     public void reset() {

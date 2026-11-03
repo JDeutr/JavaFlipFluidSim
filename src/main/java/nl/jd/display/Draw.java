@@ -144,9 +144,6 @@ public class Draw {
                     y0 + (y1 - y0) * s / steps, rgb);
         }
     }
-
-    // Left: drag fluid. Right: push it away. Wheel: radius.
-    // Ctrl+Left: add obstacle. Ctrl+Right: erase obstacle. Ctrl+Wheel: brush size.
     public void drawCursor() {
         MouseAdapter mouseAdapter = new MouseAdapter() {
             @Override

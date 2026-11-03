@@ -11,11 +11,10 @@ public class Particles {
     static final float MAX_POINTER_SPEED = 600f;
 
     public final float[] x, y, vx, vy;
+    private final Interaction interaction = new Interaction();
     public int count = 0;
     private volatile float[][] snapshot;
     private volatile float gravity = DEFAULT_GRAVITY;
-
-    private final Interaction interaction = new Interaction();
     private float prevPointerX, prevPointerY, pointerVx, pointerVy;
     private boolean pointerInitialised;
 
@@ -37,16 +36,6 @@ public class Particles {
         vx[count] = 0;
         vy[count] = 0;
         count++;
-    }
-
-    public void remove(int i) {
-        int last = count - 1;
-
-        x[i] = x[last];
-        y[i] = y[last];
-        vx[i] = vx[last];
-        vy[i] = vy[last];
-        count--;
     }
 
     public void clear() {

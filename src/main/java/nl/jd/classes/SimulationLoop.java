@@ -11,12 +11,11 @@ public class SimulationLoop {
 
     private final int frameRate;
     private final Runnable update, render;
+    private final AtomicInteger pendingSteps = new AtomicInteger();
+    private final Queue<Runnable> physicsTasks = new ConcurrentLinkedQueue<>();
     private volatile boolean running;
     private volatile boolean paused;
     private volatile int measuredFps, measuredSteps;
-
-    private final AtomicInteger pendingSteps = new AtomicInteger();
-    private final Queue<Runnable> physicsTasks = new ConcurrentLinkedQueue<>();
 
     public SimulationLoop(int frameRate, Runnable update, Runnable render) {
         this.frameRate = frameRate;
